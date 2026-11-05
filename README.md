@@ -59,6 +59,26 @@ pnpm --filter @dme/web dev     # http://localhost:3000
 `NEXT_PUBLIC_API_URL` defaults to `http://localhost:3001/api/v1` (see
 `apps/web/.env.example`).
 
+## Agent service
+
+Python 3.13 FastAPI service, fully local LLM stack through Ollama:
+
+- `phi4-mini` — schema-constrained clinical extraction
+- `nomic-embed-text` — 768-dim embeddings for the policy RAG pipeline
+
+| Method | Path       | Description                                     |
+| ------ | ---------- | ----------------------------------------------- |
+| GET    | `/health`  | Ollama reachability + active models             |
+| POST   | `/extract` | clinical notes → structured facts (JSON-schema) |
+| POST   | `/embed`   | text → embeddings (used by RAG ingestion)       |
+
+```bash
+cd services/agent
+uv venv .venv
+uv pip install --python .venv/Scripts/python.exe -r requirements.txt
+.venv/Scripts/python.exe -m uvicorn app.main:app --reload --port 8000
+```
+
 ## Docs
 
 Step-by-step build decisions live in [`docs/`](docs/README.md).

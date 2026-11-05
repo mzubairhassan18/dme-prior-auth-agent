@@ -1,9 +1,9 @@
-# Pinned in the `agent-service-and-llm` step — placeholder list of what's coming:
-# langgraph
-# langchain-core
-# openai          (OpenAI-compatible client pointed at local Ollama)
-# fastapi
-# grpcio / grpcio-tools
-# redis
-# pika            (RabbitMQ)
-# pgvector / sqlalchemy
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
+httpx==0.28.1
+pydantic==2.14.3
+pydantic-settings==2.16.2
+
+# dev / test
+pytest==9.2.0
+pytest-asyncio==1.4.1.post1
