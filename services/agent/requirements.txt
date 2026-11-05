@@ -1,0 +1,9 @@
+# Pinned in the `agent-service-and-llm` step — placeholder list of what's coming:
+# langgraph
+# langchain-core
+# openai          (OpenAI-compatible client pointed at local Ollama)
+# fastapi
+# grpcio / grpcio-tools
+# redis
+# pika            (RabbitMQ)
+# pgvector / sqlalchemy
