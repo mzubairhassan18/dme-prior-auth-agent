@@ -27,6 +27,22 @@ pnpm lint              # turbo lint
 pnpm dev               # turbo dev
 ```
 
+## API
+
+Base URL: `http://localhost:3001/api/v1`
+
+| Method | Path                         | Description                           |
+| ------ | ---------------------------- | ------------------------------------- |
+| GET    | `/health`                    | status + db check                     |
+| GET    | `/patients`                  | list patients (with order counts)     |
+| GET    | `/patients/:id`              | patient with orders + decisions       |
+| GET    | `/orders?status=&patientId=` | list orders, optional filters         |
+| GET    | `/orders/:id`                | order with patient + decision         |
+| POST   | `/orders`                    | create order (Zod-validated, audited) |
+
+Errors are RFC 7807 `application/problem+json`. Run the API with
+`pnpm --filter @dme/api start:dev`.
+
 ## Docs
 
 Step-by-step build decisions live in [`docs/`](docs/README.md).

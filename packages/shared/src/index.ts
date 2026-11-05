@@ -1,5 +1,6 @@
-/**
- * Shared TypeScript contracts between the web app and the API.
- * Populated in the `web-app-vertical-slice` step.
- */
+export * from './schemas/patient.js';
+export * from './schemas/decision.js';
+export * from './schemas/order.js';
+export * from './schemas/problem.js';
+
 export const API_VERSION = 'v1';

@@ -7,7 +7,7 @@ each step. File names are the real step names.
 | ----------------------------- | ----------------------------------- | ---------------------------------------------- |
 | repo-scaffolding              | [plan](plan/repo-scaffolding.md)    | ✅ [progress](progress/repo-scaffolding.md)    |
 | database-foundation           | [plan](plan/database-foundation.md) | ✅ [progress](progress/database-foundation.md) |
-| api-service                   | —                                   | —                                              |
+| api-service                   | [plan](plan/api-service.md)         | ✅ [progress](progress/api-service.md)         |
 | web-app-vertical-slice        | —                                   | —                                              |
 | agent-service-and-llm         | —                                   | —                                              |
 | rag-pipeline                  | —                                   | —                                              |
