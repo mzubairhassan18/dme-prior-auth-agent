@@ -43,6 +43,22 @@ Base URL: `http://localhost:3001/api/v1`
 Errors are RFC 7807 `application/problem+json`. Run the API with
 `pnpm --filter @dme/api start:dev`.
 
+## Web app
+
+![Dashboard](docs/assets/dashboard.png)
+
+- `/` — prior-authorization queue: status stats, orders with patient/insurance,
+  HCPCS/ICD-10 codes, clinical note preview, 5-second refresh
+- `/intake` — DME order form validated by the **same Zod schema as the API**; server
+  problem details map back onto form fields
+
+```bash
+pnpm --filter @dme/web dev     # http://localhost:3000
+```
+
+`NEXT_PUBLIC_API_URL` defaults to `http://localhost:3001/api/v1` (see
+`apps/web/.env.example`).
+
 ## Docs
 
 Step-by-step build decisions live in [`docs/`](docs/README.md).
