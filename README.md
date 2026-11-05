@@ -20,10 +20,11 @@ Postgres, Redis, RabbitMQ, MinIO via Docker.
 ## Commands
 
 ```bash
-pnpm install     # install JS workspace
-pnpm build       # turbo build (web + api)
-pnpm lint        # turbo lint
-pnpm dev         # turbo dev
+docker compose up -d   # start Postgres (database-foundation step)
+pnpm install           # install JS workspace
+pnpm build             # turbo build (web + api)
+pnpm lint              # turbo lint
+pnpm dev               # turbo dev
 ```
 
 ## Docs

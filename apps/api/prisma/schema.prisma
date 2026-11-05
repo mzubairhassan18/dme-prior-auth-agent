@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum OrderStatus {
+  SUBMITTED
+  ANALYZING
+  DECISION_READY
+  FAILED
+}
+
+enum DecisionOutcome {
+  APPROVE
+  NEEDS_MORE_INFO
+  DENY
+}
+
+/// A patient submitting a DME order (client-facing intake data).
+model Patient {
+  id                String     @id @default(uuid()) @db.Uuid
+  firstName         String     @map("first_name")
+  lastName          String     @map("last_name")
+  dateOfBirth       DateTime   @db.Date @map("date_of_birth")
+  insuranceProvider String     @map("insurance_provider")
+  memberId          String     @map("member_id")
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+  orders            DmeOrder[]
+
+  @@map("patients")
+}
+
+/// A durable medical equipment order awaiting prior authorization.
+model DmeOrder {
+  id            String                   @id @default(uuid()) @db.Uuid
+  patientId     String                   @map("patient_id") @db.Uuid
+  patient       Patient                  @relation(fields: [patientId], references: [id])
+  equipmentCode String                   @map("equipment_code") // HCPCS code
+  diagnosisCode String                   @map("diagnosis_code") // ICD-10 code
+  quantity      Int                      @default(1)
+  clinicalNotes String                   @map("clinical_notes") @db.Text
+  status        OrderStatus              @default(SUBMITTED)
+  createdAt     DateTime                 @default(now()) @map("created_at")
+  updatedAt     DateTime                 @updatedAt @map("updated_at")
+  decision      AuthorizationDecision?
+
+  @@map("dme_orders")
+}
+
+/// The agent's prior-authorization recommendation for an order.
+/// Narrowed to classification (phi4-mini friendly) — outcome + short rationale.
+model AuthorizationDecision {
+  id               String           @id @default(uuid()) @db.Uuid
+  orderId          String           @unique @map("order_id") @db.Uuid
+  order            DmeOrder         @relation(fields: [orderId], references: [id])
+  outcome          DecisionOutcome
+  rationale        String           @db.Text
+  policyReference  String           @map("policy_reference")
+  missingDocuments String[]         @map("missing_documents")
+  confidence       Float?
+  modelUsed        String           @map("model_used")
+  createdAt        DateTime         @default(now()) @map("created_at")
+
+  @@map("authorization_decisions")
+}
+
+/// Generic audit trail — every write from API, agent, or human appends here.
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  action     String
+  actor      String   @default("system")
+  detail     Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
