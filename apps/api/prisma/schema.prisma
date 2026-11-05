@@ -82,3 +82,32 @@ model AuditLog {
   @@index([entityType, entityId])
   @@map("audit_logs")
 }
+
+/// Payer policy documents that ground prior-authorization decisions.
+model PolicyDocument {
+  id            String        @id @default(uuid()) @db.Uuid
+  slug          String        @unique
+  title         String
+  payer         String
+  effectiveDate DateTime      @map("effective_date") @db.Date
+  source        String
+  createdAt     DateTime      @default(now()) @map("created_at")
+  chunks        PolicyChunk[]
+
+  @@map("policy_documents")
+}
+
+/// Heading-aware chunk of a policy + its 768-dim nomic-embed-text vector.
+model PolicyChunk {
+  id         String                   @id @default(uuid()) @db.Uuid
+  documentId String                   @map("document_id") @db.Uuid
+  document   PolicyDocument           @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  chunkIndex Int                      @map("chunk_index")
+  section    String?
+  content    String                   @db.Text
+  embedding  Unsupported("vector(768)")
+  createdAt  DateTime                 @default(now()) @map("created_at")
+
+  @@unique([documentId, chunkIndex])
+  @@map("policy_chunks")
+}

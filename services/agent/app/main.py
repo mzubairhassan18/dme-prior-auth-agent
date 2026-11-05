@@ -11,11 +11,17 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from .config import get_settings
 from .extraction import extract_clinical_data
 from .llm import ChatProvider, OllamaProvider, ProviderError
+from .rag import PolicyRetriever, RetrievalError, list_policy_documents
 from .schemas import (
     EmbedRequest,
     EmbedResponse,
     ExtractionRequest,
     ExtractionResponse,
+    PolicyDocumentRef,
+    PolicyDocumentSummary,
+    PolicySearchRequest,
+    PolicySearchResponse,
+    PolicySearchResult,
 )
 
 logger = logging.getLogger("agent")
@@ -111,6 +117,19 @@ async def provider_exception_handler(
     )
 
 
+@app.exception_handler(RetrievalError)
+async def retrieval_exception_handler(
+    request: Request, exc: RetrievalError
+) -> JSONResponse:
+    logger.warning("retrieval error: %s", exc)
+    return problem(
+        status=503,
+        title="Policy index unavailable",
+        detail=str(exc),
+        instance=request.url.path,
+    )
+
+
 @app.get("/health")
 async def health(provider: ProviderDep) -> dict[str, str]:
     ollama_up = await provider.ping()
@@ -142,4 +161,47 @@ async def embed(payload: EmbedRequest, provider: ProviderDep) -> EmbedResponse:
         model=settings.ollama_embed_model,
         dimensions=len(embeddings[0]),
         embeddings=embeddings,
+    )
+
+
+@app.get("/policies", response_model=list[PolicyDocumentSummary])
+async def policies() -> list[PolicyDocumentSummary]:
+    rows = await list_policy_documents(settings)
+    return [
+        PolicyDocumentSummary(
+            slug=row.slug,
+            title=row.title,
+            payer=row.payer,
+            effective_date=row.effective_date,
+            source=row.source,
+            chunks=row.chunks,
+        )
+        for row in rows
+    ]
+
+
+@app.post("/policies/search", response_model=PolicySearchResponse)
+async def search_policies(
+    payload: PolicySearchRequest, provider: ProviderDep
+) -> PolicySearchResponse:
+    started = time.perf_counter()
+    retriever = PolicyRetriever(settings, provider)
+    chunks = await retriever.search(payload.query, payload.top_k)
+
+    return PolicySearchResponse(
+        results=[
+            PolicySearchResult(
+                score=chunk.score,
+                section=chunk.section,
+                content=chunk.content,
+                document=PolicyDocumentRef(
+                    slug=chunk.document_slug,
+                    title=chunk.document_title,
+                    payer=chunk.payer,
+                ),
+            )
+            for chunk in chunks
+        ],
+        model=settings.ollama_embed_model,
+        latency_ms=round((time.perf_counter() - started) * 1000),
     )

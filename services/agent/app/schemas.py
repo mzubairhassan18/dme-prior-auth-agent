@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -61,3 +62,36 @@ class EmbedResponse(BaseModel):
     model: str
     dimensions: int
     embeddings: list[list[float]]
+
+
+class PolicySearchRequest(BaseModel):
+    query: str = Field(min_length=3, max_length=1000)
+    top_k: int = Field(default=4, ge=1, le=10)
+
+
+class PolicyDocumentRef(BaseModel):
+    slug: str
+    title: str
+    payer: str
+
+
+class PolicySearchResult(BaseModel):
+    score: float
+    section: str | None
+    content: str
+    document: PolicyDocumentRef
+
+
+class PolicySearchResponse(BaseModel):
+    results: list[PolicySearchResult]
+    model: str
+    latency_ms: int
+
+
+class PolicyDocumentSummary(BaseModel):
+    slug: str
+    title: str
+    payer: str
+    effective_date: date
+    source: str
+    chunks: int

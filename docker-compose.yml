@@ -1,6 +1,8 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    # pgvector-enabled PG16 for the policy RAG index (step 6). The alpine image
+    # cannot install the vector extension; same major version, so the volume is compatible.
+    image: pgvector/pgvector:pg16
     container_name: dme-postgres
     environment:
       POSTGRES_USER: postgres

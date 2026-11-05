@@ -10,7 +10,7 @@ each step. File names are the real step names.
 | api-service                   | [plan](plan/api-service.md)            | ✅ [progress](progress/api-service.md)            |
 | web-app-vertical-slice        | [plan](plan/web-app-vertical-slice.md) | ✅ [progress](progress/web-app-vertical-slice.md) |
 | agent-service-and-llm         | [plan](plan/agent-service-and-llm.md)  | ✅ [progress](progress/agent-service-and-llm.md)  |
-| rag-pipeline                  | —                                      | —                                                 |
+| rag-pipeline                  | [plan](plan/rag-pipeline.md)           | ✅ [progress](progress/rag-pipeline.md)           |
 | prior-auth-agent-workflow     | —                                      | —                                                 |
 | event-driven-messaging        | —                                      | —                                                 |
 | grpc-contracts                | —                                      | —                                                 |

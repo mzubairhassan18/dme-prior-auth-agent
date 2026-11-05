@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     ollama_chat_model: str = "phi4-mini"
     ollama_embed_model: str = "nomic-embed-text"
     ollama_timeout_seconds: float = 180.0
+    database_url: str = "postgresql://postgres:postgres@localhost:5432/dme"
     agent_port: int = 8000
 
     model_config = SettingsConfigDict(

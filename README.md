@@ -79,6 +79,19 @@ uv pip install --python .venv/Scripts/python.exe -r requirements.txt
 .venv/Scripts/python.exe -m uvicorn app.main:app --reload --port 8000
 ```
 
+### Policy RAG
+
+Three synthetic payer policies (`services/agent/policies/`) are chunked by section,
+embedded with `nomic-embed-text`, and stored in Postgres + **pgvector** (HNSW cosine
+index). `POST /policies/search` returns scored policy sections with document/section
+citations that the decision workflow uses.
+
+```bash
+docker compose up -d   # pgvector/pgvector:pg16
+cd services/agent
+.venv/Scripts/python.exe -m scripts.ingest_policies
+```
+
 ## Docs
 
 Step-by-step build decisions live in [`docs/`](docs/README.md).

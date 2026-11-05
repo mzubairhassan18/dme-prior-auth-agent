@@ -22,13 +22,28 @@ Ollama at `http://localhost:11434`.
 
 ## Endpoints
 
-| Method | Path       | Description                                           |
-| ------ | ---------- | ----------------------------------------------------- |
-| GET    | `/health`  | service status + Ollama reachability + active models  |
-| POST   | `/extract` | schema-constrained clinical extraction from notes     |
-| POST   | `/embed`   | embeddings for up to 32 texts (used by RAG ingestion) |
+| Method | Path               | Description                                           |
+| ------ | ------------------ | ----------------------------------------------------- |
+| GET    | `/health`          | service status + Ollama reachability + active models  |
+| POST   | `/extract`         | schema-constrained clinical extraction from notes     |
+| POST   | `/embed`           | embeddings for up to 32 texts (used by RAG ingestion) |
+| GET    | `/policies`        | indexed policy documents with chunk counts            |
+| POST   | `/policies/search` | vector search over policy chunks with citations       |
 
 Errors use RFC 7807 `application/problem+json`, matching the NestJS API.
+
+## Policy RAG
+
+Policy markdown lives in `policies/` with YAML front matter (title, payer, effective,
+source). The corpus is embedded with `nomic-embed-text` into Postgres + pgvector.
+
+```bash
+# requires the pgvector-enabled Postgres (docker compose up -d) and Ollama
+.venv/Scripts/python.exe -m scripts.ingest_policies
+```
+
+`DATABASE_URL` defaults to `postgresql://postgres:postgres@localhost:5432/dme`.
+Re-running ingestion replaces each document's chunks, so it is idempotent.
 
 ## Test
 
