@@ -1,6 +1,7 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { connect, type Channel, type ChannelModel, type ConsumeMessage } from 'amqplib';
+import { CacheService } from '../cache/cache.service.js';
 import { OrdersGateway, type OrderRealtimeEvent } from './orders.gateway.js';
 
 const EXCHANGE = 'dme.events';
@@ -29,6 +30,7 @@ export class RealtimeEventsConsumer implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly config: ConfigService,
     private readonly gateway: OrdersGateway,
+    private readonly cache: CacheService,
   ) {}
 
   onModuleInit(): void {
@@ -91,7 +93,9 @@ export class RealtimeEventsConsumer implements OnModuleInit, OnModuleDestroy {
       const queue = await channel.assertQueue(QUEUE, { durable: true });
       await channel.bindQueue(queue.queue, EXCHANGE, 'order.*');
       await channel.prefetch(10);
-      await channel.consume(queue.queue, (message) => this.handle(message, channel));
+      await channel.consume(queue.queue, (message) => {
+        void this.handle(message, channel);
+      });
 
       this.logger.log(`dashboard event consumer ready — queue=${QUEUE}`);
     } catch (error) {
@@ -102,7 +106,7 @@ export class RealtimeEventsConsumer implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private handle(message: ConsumeMessage | null, channel: Channel): void {
+  private async handle(message: ConsumeMessage | null, channel: Channel): Promise<void> {
     if (!message) {
       return;
     }
@@ -118,6 +122,11 @@ export class RealtimeEventsConsumer implements OnModuleInit, OnModuleDestroy {
         occurredAt: event.occurredAt ?? new Date().toISOString(),
         data: event.data as Record<string, unknown>,
       };
+
+      const orderId = typeof payload.data.orderId === 'string' ? payload.data.orderId : undefined;
+      // Refresh the cache before clients refetch, otherwise they would read stale rows.
+      await this.cache.invalidateOrders(orderId);
+
       this.gateway.broadcast(payload);
       channel.ack(message);
     } catch (error) {

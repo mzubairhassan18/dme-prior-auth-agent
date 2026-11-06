@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { AuthorizationDecisionSchema } from './decision.js';
+import { ClinicalDocumentSchema } from './document.js';
 import { PatientSchema } from './patient.js';
 
 export const OrderStatusSchema = z.enum(['SUBMITTED', 'ANALYZING', 'DECISION_READY', 'FAILED']);
@@ -40,6 +41,7 @@ export const OrderSchema = z.object({
   updatedAt: z.string(),
   patient: PatientSchema.optional(),
   decision: AuthorizationDecisionSchema.nullable().optional(),
+  documents: z.array(ClinicalDocumentSchema).optional(),
 });
 
 export type Order = z.infer<typeof OrderSchema>;

@@ -7,8 +7,8 @@ drafts a prior-authorization recommendation — with a real-time operator dashbo
 ## Architecture (evolving)
 
 ```
-apps/web      Next.js 16 + Tailwind 4 + React 19   — intake form & agent monitor
-apps/api      NestJS 12 (Node 24)                  — REST API / event publisher / gRPC client
+apps/web      Next.js 16 + Tailwind 4 + React 19   — intake, queue & document console
+apps/api      NestJS 12 (Node 24)                  — REST / events / gRPC / cache + storage
 services/agent Python 3.13 + LangGraph             — RAG + LLM agent workflow & event worker
 packages/shared TS contracts shared web ↔ api
 docs/         plan/ and progress/ notes per build step
@@ -20,7 +20,7 @@ Postgres + pgvector, RabbitMQ, Redis, MinIO via Docker.
 ## Commands
 
 ```bash
-docker compose up -d   # start Postgres + RabbitMQ
+docker compose up -d   # start Postgres, RabbitMQ, Redis, MinIO
 pnpm install           # install JS workspace
 pnpm build             # turbo build (web + api)
 pnpm lint              # turbo lint
@@ -31,15 +31,18 @@ pnpm dev               # turbo dev
 
 Base URL: `http://localhost:3001/api/v1`
 
-| Method | Path                         | Description                            |
-| ------ | ---------------------------- | -------------------------------------- |
-| GET    | `/health`                    | status + db check                      |
-| GET    | `/patients`                  | list patients (with order counts)      |
-| GET    | `/patients/:id`              | patient with orders + decisions        |
-| GET    | `/orders?status=&patientId=` | list orders, optional filters          |
-| GET    | `/orders/:id`                | order with patient + decision          |
-| POST   | `/orders`                    | create order (Zod-validated, audited)  |
-| POST   | `/orders/:id/analyze-grpc`   | proxy to the agent's gRPC AnalyzeOrder |
+| Method | Path                                    | Description                            |
+| ------ | --------------------------------------- | -------------------------------------- |
+| GET    | `/health`                               | status + db check                      |
+| GET    | `/patients`                             | list patients (with order counts)      |
+| GET    | `/patients/:id`                         | patient with orders + decisions        |
+| GET    | `/orders?status=&patientId=`            | list orders, optional filters          |
+| GET    | `/orders/:id`                           | order + patient, decision, documents   |
+| POST   | `/orders`                               | create order (Zod-validated, audited)  |
+| POST   | `/orders/:id/analyze-grpc`              | proxy to the agent's gRPC AnalyzeOrder |
+| POST   | `/orders/:id/documents`                 | upload document (multipart, 5 MB)      |
+| GET    | `/orders/:id/documents`                 | document metadata                      |
+| GET    | `/orders/:id/documents/:documentId/url` | 15-minute presigned download           |
 
 Errors are RFC 7807 `application/problem+json`. Run the API with
 `pnpm --filter @dme/api start:dev`.
@@ -52,6 +55,10 @@ Errors are RFC 7807 `application/problem+json`. Run the API with
   10s polling fallback), decision badges, patient/insurance and HCPCS/ICD-10 context
 - `/intake` — DME order form validated by the **same Zod schema as the API**; server
   problem details map back onto form fields
+- `/orders/[id]` — decision rationale, cited policy, missing documentation, and
+  clinical-document upload/download; status changes stream in live
+
+![Order detail with clinical document](docs/assets/order-detail.png)
 
 ```bash
 pnpm --filter @dme/web dev     # http://localhost:3000
@@ -108,6 +115,21 @@ rejected to a dead-letter queue; the HTTP endpoint remains available for manual 
 ```
 
 RabbitMQ management UI: `http://localhost:15672` (`dme` / `dme`).
+
+### Caching & document storage
+
+Order reads are cache-aside in **Redis**: list keys (`orders:list:*`, 15s) and detail
+keys (`orders:item:*`, 30s) are invalidated with `SCAN` on every write and every
+`order.*` event. A Redis outage is only a cache miss — reads fall through to Postgres.
+
+Clinical documents live in **MinIO** (`dme-clinical-documents`); Postgres stores the
+metadata and audit row. Uploads are limited to 5 MB PDF/PNG/JPEG and downloads use
+15-minute presigned URLs, so object-storage credentials never reach the browser.
+
+- MinIO console: `http://localhost:9001` (`dme` / `dme-local-secret`)
+- S3 endpoint: `http://localhost:9000`
+- The compose file pins a community mirror of the last MinIO release, because official
+  MinIO images were removed from Docker Hub and Quay in 2026.
 
 ### gRPC
 

@@ -37,6 +37,39 @@ services:
       timeout: 10s
       retries: 12
 
+  redis:
+    # Cache for order reads; AOF keeps the demo cache warm across restarts.
+    image: redis:7-alpine
+    container_name: dme-redis
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '6379:6379'
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  minio:
+    # Official MinIO images were removed from Docker Hub and Quay in 2026.
+    # This pinned community mirror is the last release (CVE-2025-62506 fixed).
+    # S3 API: http://localhost:9000 — console: http://localhost:9001
+    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z
+    container_name: dme-minio
+    command: ['server', '/data', '--console-address', ':9001']
+    environment:
+      MINIO_ROOT_USER: dme
+      MINIO_ROOT_PASSWORD: dme-local-secret
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - miniodata:/data
+
 volumes:
   pgdata:
   rabbitmqdata:
+  redisdata:
+  miniodata:

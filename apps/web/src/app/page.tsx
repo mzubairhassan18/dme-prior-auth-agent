@@ -160,7 +160,7 @@ export default function DashboardPage() {
               key={order.id}
               className="flex flex-wrap items-start justify-between gap-3 px-5 py-4"
             >
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-slate-900">
                   {order.patient
                     ? `${order.patient.firstName} ${order.patient.lastName}`
@@ -197,11 +197,17 @@ export default function DashboardPage() {
                   </div>
                 )}
               </div>
-              <div className="flex flex-col items-end gap-1.5">
+              <div className="flex shrink-0 flex-col items-end gap-1.5">
                 <StatusBadge status={order.status} />
                 <span className="text-xs text-slate-400">
                   {dateFormatter.format(new Date(order.createdAt))}
                 </span>
+                <Link
+                  href={`/orders/${order.id}`}
+                  className="text-xs font-medium text-teal-700 hover:text-teal-800 hover:underline"
+                >
+                  Details →
+                </Link>
               </div>
             </li>
           ))}

@@ -48,6 +48,7 @@ model DmeOrder {
   createdAt     DateTime                 @default(now()) @map("created_at")
   updatedAt     DateTime                 @updatedAt @map("updated_at")
   decision      AuthorizationDecision?
+  documents     ClinicalDocument[]
 
   @@map("dme_orders")
 }
@@ -67,6 +68,21 @@ model AuthorizationDecision {
   createdAt        DateTime         @default(now()) @map("created_at")
 
   @@map("authorization_decisions")
+}
+
+/// Clinical documents uploaded for an order; bytes live in S3-compatible storage.
+model ClinicalDocument {
+  id          String   @id @default(uuid()) @db.Uuid
+  orderId     String   @map("order_id") @db.Uuid
+  order       DmeOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fileName    String   @map("file_name")
+  contentType String   @map("content_type")
+  size        Int
+  storageKey  String   @unique @map("storage_key")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([orderId])
+  @@map("clinical_documents")
 }
 
 /// Generic audit trail — every write from API, agent, or human appends here.
