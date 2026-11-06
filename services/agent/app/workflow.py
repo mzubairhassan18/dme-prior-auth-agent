@@ -39,13 +39,22 @@ class WorkflowState(TypedDict, total=False):
     decision: DecisionRecommendation
 
 
+def _citation_key(label: str) -> str:
+    """Canonical form for comparing model output with retrieved labels."""
+    return label.strip().strip("[]\"'`").strip().casefold()
+
+
 def normalize_citation(
     decision: DecisionRecommendation, citations: list[RetrievedChunk]
 ) -> DecisionRecommendation:
     """Ground the citation: unknown references fall back to the top policy chunk."""
-    labels = {citation_label(chunk) for chunk in citations}
-    if decision.policy_reference in labels:
+    labels = {_citation_key(citation_label(chunk)): citation_label(chunk) for chunk in citations}
+    matched = labels.get(_citation_key(decision.policy_reference))
+    if matched:
+        if matched != decision.policy_reference:
+            return decision.model_copy(update={"policy_reference": matched})
         return decision
+
     logger.warning(
         "model cited unknown policy reference %r — falling back to %r",
         decision.policy_reference,

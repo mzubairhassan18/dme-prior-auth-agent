@@ -9,11 +9,12 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from .bootstrap import build_runtime
 from .config import get_settings
 from .extraction import extract_clinical_data
-from .llm import ChatProvider, OllamaProvider, ProviderError
+from .llm import ChatProvider, ProviderError
 from .rag import PolicyRetriever, RetrievalError, list_policy_documents
-from .repository import OrderNotFoundError, OrderRepository, RepositoryError
+from .repository import OrderNotFoundError, RepositoryError
 from .schemas import (
     AnalysisResponse,
     EmbedRequest,
@@ -27,7 +28,7 @@ from .schemas import (
     PolicySearchResponse,
     PolicySearchResult,
 )
-from .workflow import AnalysisService, WorkflowError, build_workflow
+from .workflow import AnalysisService, WorkflowError
 
 logger = logging.getLogger("agent")
 settings = get_settings()
@@ -35,18 +36,10 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    provider = OllamaProvider(settings)
-    retriever = PolicyRetriever(settings, provider)
-    repository = OrderRepository(settings)
-    graph = build_workflow(
-        provider,
-        retriever,
-        repository,
-        model_name=settings.ollama_chat_model,
-    )
+    runtime = build_runtime(settings)
 
-    app.state.provider = provider
-    app.state.analysis = AnalysisService(graph, repository)
+    app.state.provider = runtime.provider
+    app.state.analysis = runtime.analysis
 
     logger.info(
         "agent started — chat=%s embed=%s",
@@ -54,7 +47,7 @@ async def lifespan(app: FastAPI):
         settings.ollama_embed_model,
     )
     yield
-    await provider.aclose()
+    await runtime.aclose()
 
 
 app = FastAPI(

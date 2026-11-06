@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     ollama_timeout_seconds: float = 180.0
     database_url: str = "postgresql://postgres:postgres@localhost:5432/dme"
     agent_port: int = 8000
+    rabbitmq_url: str = "amqp://dme:dme@localhost:5672"
+    rabbitmq_exchange: str = "dme.events"
+    rabbitmq_order_queue: str = "agent.order-created"
+    rabbitmq_dead_letter_exchange: str = "dme.dlx"
 
     model_config = SettingsConfigDict(
         env_file=".env",

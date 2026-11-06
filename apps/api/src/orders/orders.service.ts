@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { CreateOrderInput, OrderQuery } from '@dme/shared';
+import { EventsService } from '../events/events.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: EventsService,
+  ) {}
 
   findAll(query: OrderQuery) {
     return this.prisma.dmeOrder.findMany({
@@ -40,8 +44,8 @@ export class OrdersService {
       throw new NotFoundException('Patient not found');
     }
 
-    return this.prisma.$transaction(async (transaction) => {
-      const order = await transaction.dmeOrder.create({
+    const order = await this.prisma.$transaction(async (transaction) => {
+      const created = await transaction.dmeOrder.create({
         data: {
           patientId: input.patientId,
           equipmentCode: input.equipmentCode,
@@ -55,17 +59,23 @@ export class OrdersService {
       await transaction.auditLog.create({
         data: {
           entityType: 'dme_order',
-          entityId: order.id,
+          entityId: created.id,
           action: 'created',
           actor: 'api',
           detail: {
-            equipmentCode: order.equipmentCode,
-            diagnosisCode: order.diagnosisCode,
+            equipmentCode: created.equipmentCode,
+            diagnosisCode: created.diagnosisCode,
           },
         },
       });
 
-      return order;
+      return created;
     });
+
+    // Publish only after the transaction commits. Failures are logged and
+    // swallowed by EventsService; the manual /analyze endpoint remains a retry path.
+    await this.events.publishOrderCreated(order);
+
+    return order;
   }
 }

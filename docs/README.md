@@ -12,7 +12,7 @@ each step. File names are the real step names.
 | agent-service-and-llm         | [plan](plan/agent-service-and-llm.md)     | ✅ [progress](progress/agent-service-and-llm.md)     |
 | rag-pipeline                  | [plan](plan/rag-pipeline.md)              | ✅ [progress](progress/rag-pipeline.md)              |
 | prior-auth-agent-workflow     | [plan](plan/prior-auth-agent-workflow.md) | ✅ [progress](progress/prior-auth-agent-workflow.md) |
-| event-driven-messaging        | —                                         | —                                                    |
+| event-driven-messaging        | [plan](plan/event-driven-messaging.md)    | ✅ [progress](progress/event-driven-messaging.md)    |
 | grpc-contracts                | —                                         | —                                                    |
 | realtime-dashboard            | —                                         | —                                                    |
 | caching-and-document-storage  | —                                         | —                                                    |

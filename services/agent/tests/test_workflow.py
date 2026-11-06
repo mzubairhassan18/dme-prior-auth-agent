@@ -148,6 +148,17 @@ async def test_unknown_citation_falls_back_to_top_chunk():
     assert repository.saved[0][1].policy_reference == "cpap › Coverage criteria"
 
 
+async def test_bracketed_citation_is_canonicalized():
+    service, _, _, repository = make_service(
+        provider=FakeProvider(policy_reference=" [CPAP › coverage criteria] ")
+    )
+
+    result = await service.analyze(ORDER.id)
+
+    assert result.decision.policy_reference == "cpap › Coverage criteria"
+    assert repository.saved[0][1].policy_reference == "cpap › Coverage criteria"
+
+
 async def test_provider_failure_marks_order_failed():
     service, _, _, repository = make_service(provider=FailingProvider())
 

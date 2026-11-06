@@ -18,5 +18,25 @@ services:
       timeout: 5s
       retries: 12
 
+  rabbitmq:
+    # Event broker: order.created fan-out to the analysis worker.
+    # Management UI: http://localhost:15672 (dme / dme)
+    image: rabbitmq:4-management-alpine
+    container_name: dme-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: dme
+      RABBITMQ_DEFAULT_PASS: dme
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    volumes:
+      - rabbitmqdata:/var/lib/rabbitmq
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 10s
+      timeout: 10s
+      retries: 12
+
 volumes:
   pgdata:
+  rabbitmqdata:

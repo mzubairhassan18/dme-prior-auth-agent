@@ -8,19 +8,19 @@ drafts a prior-authorization recommendation — with a real-time operator dashbo
 
 ```
 apps/web      Next.js 16 + Tailwind 4 + React 19   — intake form & agent monitor
-apps/api      NestJS 12 (Node 24)                  — REST API / gRPC client
-services/agent Python 3.13 + LangGraph             — RAG + LLM agent workflow
+apps/api      NestJS 12 (Node 24)                  — REST API / event publisher / gRPC client
+services/agent Python 3.13 + LangGraph             — RAG + LLM agent workflow & event worker
 packages/shared TS contracts shared web ↔ api
 docs/         plan/ and progress/ notes per build step
 ```
 
 Runs fully local: **Ollama (phi4-mini + nomic-embed-text)** for LLM/embeddings,
-Postgres, Redis, RabbitMQ, MinIO via Docker.
+Postgres + pgvector, RabbitMQ, Redis, MinIO via Docker.
 
 ## Commands
 
 ```bash
-docker compose up -d   # start Postgres (database-foundation step)
+docker compose up -d   # start Postgres + RabbitMQ
 pnpm install           # install JS workspace
 pnpm build             # turbo build (web + api)
 pnpm lint              # turbo lint
@@ -91,6 +91,21 @@ The decision is one of **APPROVE**, **NEEDS_MORE_INFO**, or **DENY**, includes a
 rationale, the cited policy section, missing documents, and a confidence score, and
 moves the order to `DECISION_READY` (or `FAILED`) with an audit trail. All inference
 stays local through Ollama.
+
+### Event-driven analysis
+
+Creating an order publishes a confirmed `order.created` event to RabbitMQ
+(topic exchange `dme.events`). A dedicated worker consumes it with prefetch 1 and runs
+the same workflow, so intake responds immediately while analysis happens in the
+background. Failures are rejected to a dead-letter queue; the HTTP endpoint remains
+available for manual retries.
+
+```bash
+# separate terminal, from services/agent
+.venv/Scripts/python.exe -m app.consumer
+```
+
+RabbitMQ management UI: `http://localhost:15672` (`dme` / `dme`).
 
 ### Policy RAG
 
