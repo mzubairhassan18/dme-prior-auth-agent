@@ -1,0 +1,232 @@
+name: dme-prior-auth
+
+# Shared by the HTTP API, gRPC server, and RabbitMQ worker.
+x-agent-env: &agent-env
+  OLLAMA_BASE_URL: '${OLLAMA_BASE_URL:-http://host.docker.internal:11434}'
+  OLLAMA_CHAT_MODEL: '${OLLAMA_CHAT_MODEL:-phi4-mini}'
+  OLLAMA_EMBED_MODEL: '${OLLAMA_EMBED_MODEL:-nomic-embed-text}'
+  DATABASE_URL: 'postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/dme'
+  RABBITMQ_URL: 'amqp://${RABBITMQ_USER:-dme}:${RABBITMQ_PASSWORD:-dme}@rabbitmq:5672'
+  RABBITMQ_EXCHANGE: dme.events
+  RABBITMQ_ORDER_QUEUE: agent.order-created
+  RABBITMQ_DEAD_LETTER_EXCHANGE: dme.dlx
+
+x-agent-build: &agent-build
+  context: .
+  dockerfile: services/agent/Dockerfile
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: '${POSTGRES_PASSWORD:-postgres}'
+      POSTGRES_DB: dme
+    ports:
+      - '${DME_BIND_ADDR:-127.0.0.1}:5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d dme']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: '${RABBITMQ_USER:-dme}'
+      RABBITMQ_DEFAULT_PASS: '${RABBITMQ_PASSWORD:-dme}'
+    ports:
+      - '${DME_BIND_ADDR:-127.0.0.1}:5672:5672'
+      - '${DME_BIND_ADDR:-127.0.0.1}:15672:15672'
+    volumes:
+      - rabbitmqdata:/var/lib/rabbitmq
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 10s
+      timeout: 10s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '${DME_BIND_ADDR:-127.0.0.1}:6379:6379'
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  minio:
+    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z
+    restart: unless-stopped
+    command: ['server', '/data', '--console-address', ':9001']
+    environment:
+      MINIO_ROOT_USER: '${MINIO_ROOT_USER:-dme}'
+      MINIO_ROOT_PASSWORD: '${MINIO_ROOT_PASSWORD:-dme-local-secret}'
+    ports:
+      - '${DME_BIND_ADDR:-127.0.0.1}:9000:9000'
+      - '${DME_BIND_ADDR:-127.0.0.1}:9001:9001'
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  # Optional self-contained model server:
+  #   docker compose ... --profile llm up -d ollama
+  #   docker compose ... exec ollama ollama pull phi4-mini
+  #   docker compose ... exec ollama ollama pull nomic-embed-text
+  # then set OLLAMA_BASE_URL=http://ollama:11434 in .env.prod.
+  ollama:
+    image: ollama/ollama:0.40.13
+    profiles: ['llm']
+    restart: unless-stopped
+    ports:
+      - '${DME_BIND_ADDR:-127.0.0.1}:11434:11434'
+    volumes:
+      - ollamadata:/root/.ollama
+
+  agent:
+    image: dme-agent:local
+    build: *agent-build
+    restart: unless-stopped
+    init: true
+    environment: *agent-env
+    command: ['python', '-m', 'uvicorn', 'app.main:app', '--host', '0.0.0.0', '--port', '8000']
+    ports:
+      - '${DME_BIND_ADDR:-127.0.0.1}:8000:8000'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  agent-grpc:
+    image: dme-agent:local
+    restart: unless-stopped
+    init: true
+    environment: *agent-env
+    command: ['python', '-m', 'app.grpc_server']
+    ports:
+      - '${DME_BIND_ADDR:-127.0.0.1}:50051:50051'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    depends_on:
+      agent:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import socket; s = socket.create_connection(('127.0.0.1', 50051), 3); s.close()",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  agent-consumer:
+    image: dme-agent:local
+    restart: unless-stopped
+    init: true
+    environment: *agent-env
+    command: ['python', '-m', 'app.consumer']
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    depends_on:
+      agent:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  api:
+    image: dme-api:local
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    init: true
+    environment:
+      NODE_ENV: production
+      PORT: '3001'
+      DATABASE_URL: 'postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/dme?schema=public'
+      RABBITMQ_URL: 'amqp://${RABBITMQ_USER:-dme}:${RABBITMQ_PASSWORD:-dme}@rabbitmq:5672'
+      AGENT_GRPC_URL: agent-grpc:50051
+      AGENT_PROTO_PATH: /app/proto/agent.proto
+      REDIS_URL: redis://redis:6379
+      MINIO_ENDPOINT: minio
+      MINIO_PUBLIC_ENDPOINT: '${MINIO_PUBLIC_ENDPOINT:-localhost}'
+      MINIO_PORT: '9000'
+      MINIO_USE_SSL: 'false'
+      MINIO_ACCESS_KEY: '${MINIO_ROOT_USER:-dme}'
+      MINIO_SECRET_KEY: '${MINIO_ROOT_PASSWORD:-dme-local-secret}'
+      MINIO_BUCKET: '${MINIO_BUCKET:-dme-clinical-documents}'
+    ports:
+      - '${DME_BIND_ADDR:-127.0.0.1}:3001:3001'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      agent-grpc:
+        condition: service_started
+
+  web:
+    image: dme-web:local
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: '${NEXT_PUBLIC_API_URL:-http://localhost:3001/api/v1}'
+        NEXT_PUBLIC_SOCKET_URL: '${NEXT_PUBLIC_SOCKET_URL:-http://localhost:3001}'
+    restart: unless-stopped
+    init: true
+    ports:
+      - '${DME_BIND_ADDR:-127.0.0.1}:3000:3000'
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  rabbitmqdata:
+  redisdata:
+  miniodata:
+  ollamadata:

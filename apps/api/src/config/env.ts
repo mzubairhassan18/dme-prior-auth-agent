@@ -9,6 +9,7 @@ export const envSchema = z.object({
   AGENT_PROTO_PATH: z.string().optional(),
   REDIS_URL: z.string().min(1).default('redis://localhost:6379'),
   MINIO_ENDPOINT: z.string().min(1).default('localhost'),
+  MINIO_PUBLIC_ENDPOINT: z.string().min(1).optional(),
   MINIO_PORT: z.coerce.number().int().positive().default(9000),
   MINIO_USE_SSL: z
     .enum(['true', 'false'])

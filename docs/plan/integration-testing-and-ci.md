@@ -31,7 +31,7 @@ concurrency group that cancels superseded runs.
 | --------- | -------------------------------------------------------------------------- | ------------------------ |
 | `js`      | `pnpm install --frozen-lockfile`, Prisma generate, `build`, `lint`, `test` | none                     |
 | `api-e2e` | install, Prisma generate + `migrate deploy`, `test:e2e`                    | `pgvector/pgvector:pg16` |
-| `python`  | `pip install -r requirements.txt`, `pytest -q`                             | none                     |
+| `python`  | `pip install -r requirements-dev.txt`, `pytest -q`                         | none                     |
 
 The JS build and e2e jobs are intentionally separate: the build/lint job stays fast
 and does not wait for Postgres, while e2e can fail independently with a clear signal.

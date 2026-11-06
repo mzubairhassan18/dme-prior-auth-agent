@@ -11,8 +11,8 @@ Fully local LLM stack via Ollama:
 ```bash
 cd services/agent
 uv venv .venv
-uv pip install --python .venv/Scripts/python.exe -r requirements.txt   # Windows
-# macOS/Linux: uv pip install --python .venv/bin/python -r requirements.txt
+uv pip install --python .venv/Scripts/python.exe -r requirements-dev.txt   # Windows
+# macOS/Linux: uv pip install --python .venv/bin/python -r requirements-dev.txt
 
 .venv/Scripts/python.exe -m uvicorn app.main:app --reload --port 8000
 ```

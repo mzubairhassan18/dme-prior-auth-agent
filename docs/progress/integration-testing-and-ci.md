@@ -13,7 +13,7 @@ with a concurrency group that cancels superseded runs.
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
 | **Build, lint & unit tests** | checkout → pnpm 10.17.1 → Node 24 (pnpm cache) → frozen install → Prisma generate → `pnpm build` → `pnpm lint` → `pnpm test` | —                                                      |
 | **API e2e (Postgres)**       | same install/generate → `prisma migrate deploy` → `test:e2e`                                                                 | `pgvector/pgvector:pg16` with `pg_isready` healthcheck |
-| **Python tests**             | Python 3.13 (pip cache) → `pip install -r requirements.txt` → `pytest -q`                                                    | —                                                      |
+| **Python tests**             | Python 3.13 (pip cache) → `pip install -r requirements-dev.txt` → `pytest -q`                                                | —                                                      |
 
 Design choices:
 

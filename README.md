@@ -4,7 +4,7 @@ Demo platform for a **Principal Full Stack Developer** application: an AI agent 
 checks DME (durable medical equipment) orders against insurance policy documents and
 drafts a prior-authorization recommendation — with a real-time operator dashboard.
 
-## Architecture (evolving)
+## Architecture
 
 ```
 apps/web      Next.js 16 + Tailwind 4 + React 19   — intake, queue & document console
@@ -17,7 +17,33 @@ docs/         plan/ and progress/ notes per build step
 Runs fully local: **Ollama (phi4-mini + nomic-embed-text)** for LLM/embeddings,
 Postgres + pgvector, RabbitMQ, Redis, MinIO via Docker.
 
-## Commands
+## Run the demo
+
+Prerequisites: Docker Desktop and Ollama with the two models pulled:
+
+```bash
+ollama pull phi4-mini
+ollama pull nomic-embed-text
+```
+
+Then build the production-like stack and seed it:
+
+```bash
+cp .env.prod.example .env.prod   # PowerShell: Copy-Item .env.prod.example .env.prod
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+docker compose --env-file .env.prod -f docker-compose.prod.yml exec api pnpm exec tsx prisma/seed.ts
+docker compose --env-file .env.prod -f docker-compose.prod.yml exec agent python -m scripts.ingest_policies
+```
+
+Open **http://localhost:3000**, create an order, and watch it move from `SUBMITTED`
+through `ANALYZING` to `DECISION_READY`. The full runbook, environment table, and AWS
+mapping are in [`docs/deployment.md`](docs/deployment.md).
+
+The first build takes several minutes (three images). Host Ollama is the default;
+`docs/deployment.md` covers the optional self-contained Ollama profile and troubleshooting
+if the containers cannot reach the host model server.
+
+## Local development
 
 ```bash
 docker compose up -d   # start Postgres, RabbitMQ, Redis, MinIO
@@ -83,7 +109,7 @@ Python 3.13 FastAPI service, fully local LLM stack through Ollama:
 ```bash
 cd services/agent
 uv venv .venv
-uv pip install --python .venv/Scripts/python.exe -r requirements.txt
+uv pip install --python .venv/Scripts/python.exe -r requirements-dev.txt
 .venv/Scripts/python.exe -m uvicorn app.main:app --reload --port 8000
 ```
 
@@ -124,7 +150,9 @@ keys (`orders:item:*`, 30s) are invalidated with `SCAN` on every write and every
 
 Clinical documents live in **MinIO** (`dme-clinical-documents`); Postgres stores the
 metadata and audit row. Uploads are limited to 5 MB PDF/PNG/JPEG and downloads use
-15-minute presigned URLs, so object-storage credentials never reach the browser.
+15-minute presigned URLs, so object-storage credentials never reach the browser. The API
+uses the internal `minio` hostname for storage operations and `MINIO_PUBLIC_ENDPOINT`
+(default `localhost`) when signing browser-facing URLs.
 
 - MinIO console: `http://localhost:9001` (`dme` / `dme-local-secret`)
 - S3 endpoint: `http://localhost:9000`
@@ -158,6 +186,20 @@ cd services/agent
 .venv/Scripts/python.exe -m scripts.ingest_policies
 ```
 
+## Testing
+
+```bash
+pnpm build && pnpm lint && pnpm test
+pnpm --filter @dme/api test:e2e
+cd services/agent && .venv/Scripts/python.exe -m pytest -q
+```
+
+The API e2e suite needs Postgres and uses the `pgvector/pgvector:pg16` image in CI;
+Redis and MinIO are optional because the app degrades gracefully. The GitHub Actions
+workflow lives in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) and runs the
+same gates on every push.
+
 ## Docs
 
-Step-by-step build decisions live in [`docs/`](docs/README.md).
+Step-by-step build decisions live in [`docs/`](docs/README.md). Deployment, demo, and
+cloud mapping notes are in [`docs/deployment.md`](docs/deployment.md).

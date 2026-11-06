@@ -1,0 +1,40 @@
+# Build context hygiene for the production images.
+
+# Git and local tooling
+.git
+.gitignore
+.github
+.husky
+.vscode
+.idea
+**/.agents
+**/.claude
+**/.windsurf
+**/.codex
+
+# JavaScript dependencies and build output
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+**/*.tsbuildinfo
+**/coverage
+
+# Python virtualenvs and caches
+**/.venv
+**/venv
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.mypy_cache
+
+# Local configuration and secrets
+**/.env
+**/.env.*
+!**/.env.example
+!/.env.prod.example
+
+# Logs and OS noise
+**/*.log
+**/.DS_Store
+**/Thumbs.db
