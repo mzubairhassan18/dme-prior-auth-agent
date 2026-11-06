@@ -54,6 +54,40 @@ class ExtractionResponse(BaseModel):
     latency_ms: int
 
 
+class DecisionRecommendation(BaseModel):
+    """The agent's grounded prior-authorization recommendation."""
+
+    outcome: Literal["APPROVE", "NEEDS_MORE_INFO", "DENY"]
+    rationale: str = Field(
+        description="How the documented facts satisfy or fail the cited coverage criteria"
+    )
+    policy_reference: str = Field(
+        description="Exact citation label of the governing policy section, e.g. 'cpap › Coverage criteria'"
+    )
+    missing_documents: list[str] = Field(
+        description="Specific documentation required before approval; empty for APPROVE"
+    )
+    confidence: float = Field(
+        ge=0.0, le=1.0, description="Certainty in the recommendation (never exactly 1.0)"
+    )
+
+
+class PolicyCitation(BaseModel):
+    document_slug: str
+    document_title: str
+    section: str | None
+    score: float
+
+
+class AnalysisResponse(BaseModel):
+    order_id: str
+    decision: DecisionRecommendation
+    extraction: ClinicalExtraction
+    citations: list[PolicyCitation]
+    model: str
+    latency_ms: int
+
+
 class EmbedRequest(BaseModel):
     texts: list[str] = Field(min_length=1, max_length=32)
 

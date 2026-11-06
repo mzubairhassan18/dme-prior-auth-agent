@@ -1,3 +1,5 @@
+from .rag import RetrievedChunk
+
 EXTRACTION_SYSTEM_PROMPT = """You are a DME prior-authorization clinical intake specialist.
 Extract only facts explicitly supported by the clinical notes.
 
@@ -28,4 +30,65 @@ def build_extraction_prompt(
 
 Clinical notes:
 \"\"\"{clinical_notes}\"\"\"
+"""
+
+
+DECISION_SYSTEM_PROMPT = """You are a DME prior-authorization medical reviewer.
+Decide exactly one outcome using ONLY the order context and the policy excerpts provided:
+
+- APPROVE: every coverage criterion in the cited policy is satisfied by documented facts.
+- NEEDS_MORE_INFO: required documentation is missing, but the order could qualify once it
+  is supplied. List exactly what is missing.
+- DENY: documented facts contradict or fail the coverage criteria, or an exclusion applies.
+
+Rules:
+- Cite one primary policy section using its exact bracketed label, for example
+  "cpap › Coverage criteria". Never invent a citation.
+- missing_documents must be specific and empty for APPROVE.
+- confidence is between 0 and 1; never exactly 1.0.
+- Do not invent clinical facts that are not in the order context.
+- Return ONLY JSON matching the provided schema."""
+
+
+def citation_label(chunk: RetrievedChunk) -> str:
+    return f"{chunk.document_slug} › {chunk.section or 'Introduction'}"
+
+
+def build_decision_prompt(
+    *,
+    equipment_code: str,
+    diagnosis_code: str,
+    quantity: int,
+    insurance_provider: str,
+    patient_name: str,
+    clinical_summary: str,
+    supporting_evidence: list[str],
+    extraction_gaps: list[str],
+    citations: list[RetrievedChunk],
+) -> str:
+    evidence = (
+        "\n".join(f"- {item}" for item in supporting_evidence)
+        or "- none documented"
+    )
+    gaps = "\n".join(f"- {item}" for item in extraction_gaps) or "- none identified"
+    excerpts = "\n\n".join(
+        f"[{citation_label(chunk)}]\n{chunk.content}" for chunk in citations
+    )
+
+    return f"""Order context:
+- Equipment: {equipment_code} x{quantity}
+- Diagnosis: {diagnosis_code}
+- Patient: {patient_name} ({insurance_provider})
+
+Extracted clinical facts:
+{clinical_summary}
+
+Supporting evidence:
+{evidence}
+
+Extraction-identified documentation gaps:
+{gaps}
+
+Policy excerpts:
+{excerpts}
 """

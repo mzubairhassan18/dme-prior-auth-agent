@@ -1,9 +1,10 @@
 import logging
 import time
+import uuid
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -12,17 +13,21 @@ from .config import get_settings
 from .extraction import extract_clinical_data
 from .llm import ChatProvider, OllamaProvider, ProviderError
 from .rag import PolicyRetriever, RetrievalError, list_policy_documents
+from .repository import OrderNotFoundError, OrderRepository, RepositoryError
 from .schemas import (
+    AnalysisResponse,
     EmbedRequest,
     EmbedResponse,
     ExtractionRequest,
     ExtractionResponse,
+    PolicyCitation,
     PolicyDocumentRef,
     PolicyDocumentSummary,
     PolicySearchRequest,
     PolicySearchResponse,
     PolicySearchResult,
 )
+from .workflow import AnalysisService, WorkflowError, build_workflow
 
 logger = logging.getLogger("agent")
 settings = get_settings()
@@ -30,14 +35,26 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.provider = OllamaProvider(settings)
+    provider = OllamaProvider(settings)
+    retriever = PolicyRetriever(settings, provider)
+    repository = OrderRepository(settings)
+    graph = build_workflow(
+        provider,
+        retriever,
+        repository,
+        model_name=settings.ollama_chat_model,
+    )
+
+    app.state.provider = provider
+    app.state.analysis = AnalysisService(graph, repository)
+
     logger.info(
         "agent started — chat=%s embed=%s",
         settings.ollama_chat_model,
         settings.ollama_embed_model,
     )
     yield
-    await app.state.provider.aclose()
+    await provider.aclose()
 
 
 app = FastAPI(
@@ -52,7 +69,12 @@ def get_provider(request: Request) -> ChatProvider:
     return request.app.state.provider
 
 
+def get_analysis(request: Request) -> AnalysisService:
+    return request.app.state.analysis
+
+
 ProviderDep = Annotated[ChatProvider, Depends(get_provider)]
+AnalysisDep = Annotated[AnalysisService, Depends(get_analysis)]
 
 
 def problem(
@@ -125,6 +147,44 @@ async def retrieval_exception_handler(
     return problem(
         status=503,
         title="Policy index unavailable",
+        detail=str(exc),
+        instance=request.url.path,
+    )
+
+
+@app.exception_handler(OrderNotFoundError)
+async def order_not_found_handler(
+    request: Request, exc: OrderNotFoundError
+) -> JSONResponse:
+    return problem(
+        status=404,
+        title="Order not found",
+        detail=f"No DME order with id {exc.args[0] if exc.args else 'unknown'}",
+        instance=request.url.path,
+    )
+
+
+@app.exception_handler(WorkflowError)
+async def workflow_exception_handler(
+    request: Request, exc: WorkflowError
+) -> JSONResponse:
+    logger.warning("workflow error: %s", exc)
+    return problem(
+        status=502,
+        title="Agent workflow error",
+        detail=str(exc),
+        instance=request.url.path,
+    )
+
+
+@app.exception_handler(RepositoryError)
+async def repository_exception_handler(
+    request: Request, exc: RepositoryError
+) -> JSONResponse:
+    logger.error("repository error: %s", exc)
+    return problem(
+        status=503,
+        title="Database unavailable",
         detail=str(exc),
         instance=request.url.path,
     )
@@ -204,4 +264,33 @@ async def search_policies(
         ],
         model=settings.ollama_embed_model,
         latency_ms=round((time.perf_counter() - started) * 1000),
+    )
+
+
+@app.post("/orders/{order_id}/analyze", response_model=AnalysisResponse)
+async def analyze_order(
+    order_id: str, analysis: AnalysisDep
+) -> AnalysisResponse:
+    try:
+        normalized_id = str(uuid.UUID(order_id))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Order not found") from None
+
+    result = await analysis.analyze(normalized_id)
+
+    return AnalysisResponse(
+        order_id=normalized_id,
+        decision=result.decision,
+        extraction=result.extraction,
+        citations=[
+            PolicyCitation(
+                document_slug=chunk.document_slug,
+                document_title=chunk.document_title,
+                section=chunk.section,
+                score=chunk.score,
+            )
+            for chunk in result.citations
+        ],
+        model=settings.ollama_chat_model,
+        latency_ms=result.latency_ms,
     )

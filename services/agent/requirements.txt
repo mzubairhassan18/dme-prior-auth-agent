@@ -4,6 +4,7 @@ httpx==0.28.1
 pydantic==2.14.3
 pydantic-settings==2.16.2
 psycopg[binary]==3.3.8
+langgraph==1.2.20
 
 # dev / test
 pytest==9.2.0

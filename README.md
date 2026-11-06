@@ -79,6 +79,19 @@ uv pip install --python .venv/Scripts/python.exe -r requirements.txt
 .venv/Scripts/python.exe -m uvicorn app.main:app --reload --port 8000
 ```
 
+### Prior-auth workflow
+
+`POST /orders/{id}/analyze` runs a LangGraph workflow over an existing order:
+
+```
+mark_analyzing → extract → retrieve policy → decide → persist
+```
+
+The decision is one of **APPROVE**, **NEEDS_MORE_INFO**, or **DENY**, includes a
+rationale, the cited policy section, missing documents, and a confidence score, and
+moves the order to `DECISION_READY` (or `FAILED`) with an audit trail. All inference
+stays local through Ollama.
+
 ### Policy RAG
 
 Three synthetic payer policies (`services/agent/policies/`) are chunked by section,
