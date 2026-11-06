@@ -16,5 +16,5 @@ each step. File names are the real step names.
 | grpc-contracts                | [plan](plan/grpc-contracts.md)               | ✅ [progress](progress/grpc-contracts.md)               |
 | realtime-dashboard            | [plan](plan/realtime-dashboard.md)           | ✅ [progress](progress/realtime-dashboard.md)           |
 | caching-and-document-storage  | [plan](plan/caching-and-document-storage.md) | ✅ [progress](progress/caching-and-document-storage.md) |
-| integration-testing-and-ci    | —                                            | —                                                       |
+| integration-testing-and-ci    | [plan](plan/integration-testing-and-ci.md)   | ✅ [progress](progress/integration-testing-and-ci.md)   |
 | deployment-and-demo-readiness | —                                            | —                                                       |
