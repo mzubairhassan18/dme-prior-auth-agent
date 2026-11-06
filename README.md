@@ -1,5 +1,7 @@
 # dme-prior-auth-agent
 
+[![CI](https://github.com/mzubairhassan18/dme-prior-auth-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/mzubairhassan18/dme-prior-auth-agent/actions/workflows/ci.yml)
+
 Demo platform for a **Principal Full Stack Developer** application: an AI agent that
 checks DME (durable medical equipment) orders against insurance policy documents and
 drafts a prior-authorization recommendation — with a real-time operator dashboard.
