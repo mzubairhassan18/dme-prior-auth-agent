@@ -31,14 +31,15 @@ pnpm dev               # turbo dev
 
 Base URL: `http://localhost:3001/api/v1`
 
-| Method | Path                         | Description                           |
-| ------ | ---------------------------- | ------------------------------------- |
-| GET    | `/health`                    | status + db check                     |
-| GET    | `/patients`                  | list patients (with order counts)     |
-| GET    | `/patients/:id`              | patient with orders + decisions       |
-| GET    | `/orders?status=&patientId=` | list orders, optional filters         |
-| GET    | `/orders/:id`                | order with patient + decision         |
-| POST   | `/orders`                    | create order (Zod-validated, audited) |
+| Method | Path                         | Description                            |
+| ------ | ---------------------------- | -------------------------------------- |
+| GET    | `/health`                    | status + db check                      |
+| GET    | `/patients`                  | list patients (with order counts)      |
+| GET    | `/patients/:id`              | patient with orders + decisions        |
+| GET    | `/orders?status=&patientId=` | list orders, optional filters          |
+| GET    | `/orders/:id`                | order with patient + decision          |
+| POST   | `/orders`                    | create order (Zod-validated, audited)  |
+| POST   | `/orders/:id/analyze-grpc`   | proxy to the agent's gRPC AnalyzeOrder |
 
 Errors are RFC 7807 `application/problem+json`. Run the API with
 `pnpm --filter @dme/api start:dev`.
@@ -106,6 +107,20 @@ available for manual retries.
 ```
 
 RabbitMQ management UI: `http://localhost:15672` (`dme` / `dme`).
+
+### gRPC
+
+The workflow is also exposed over gRPC (`proto/agent.proto`, package `dme.agent.v1`)
+for typed, language-neutral calls:
+
+```bash
+# separate terminal, from services/agent
+.venv/Scripts/python.exe -m app.grpc_server     # :50051
+.venv/Scripts/python.exe -m scripts.grpc_smoke <order-id>
+```
+
+NestJS loads the proto at runtime and calls it from
+`POST /api/v1/orders/:id/analyze-grpc`, mapping gRPC statuses to HTTP errors.
 
 ### Policy RAG
 

@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package dme.agent.v1;
+
+// Prior-authorization analysis over gRPC.
+service PriorAuthAgent {
+  rpc AnalyzeOrder (AnalyzeOrderRequest) returns (AnalyzeOrderResponse);
+}
+
+message AnalyzeOrderRequest {
+  string order_id = 1;
+}
+
+message PolicyCitation {
+  string document_slug = 1;
+  string document_title = 2;
+  string section = 3;
+  double score = 4;
+}
+
+message Equipment {
+  string code = 1;
+  string description = 2;
+  int32 quantity = 3;
+}
+
+message Diagnosis {
+  string code = 1;
+  string description = 2;
+}
+
+message ClinicalExtraction {
+  Equipment equipment = 1;
+  Diagnosis diagnosis = 2;
+  string clinical_summary = 3;
+  repeated string supporting_evidence = 4;
+  repeated string missing_information = 5;
+  string urgency = 6;
+  double confidence = 7;
+}
+
+message AnalyzeOrderResponse {
+  string order_id = 1;
+  string outcome = 2;
+  string rationale = 3;
+  string policy_reference = 4;
+  repeated string missing_documents = 5;
+  double confidence = 6;
+  repeated PolicyCitation citations = 7;
+  ClinicalExtraction extraction = 8;
+  string model = 9;
+  int32 latency_ms = 10;
+}

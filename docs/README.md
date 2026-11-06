@@ -13,7 +13,7 @@ each step. File names are the real step names.
 | rag-pipeline                  | [plan](plan/rag-pipeline.md)              | ✅ [progress](progress/rag-pipeline.md)              |
 | prior-auth-agent-workflow     | [plan](plan/prior-auth-agent-workflow.md) | ✅ [progress](progress/prior-auth-agent-workflow.md) |
 | event-driven-messaging        | [plan](plan/event-driven-messaging.md)    | ✅ [progress](progress/event-driven-messaging.md)    |
-| grpc-contracts                | —                                         | —                                                    |
+| grpc-contracts                | [plan](plan/grpc-contracts.md)            | ✅ [progress](progress/grpc-contracts.md)            |
 | realtime-dashboard            | —                                         | —                                                    |
 | caching-and-document-storage  | —                                         | —                                                    |
 | integration-testing-and-ci    | —                                         | —                                                    |

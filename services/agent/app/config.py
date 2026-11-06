@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     rabbitmq_exchange: str = "dme.events"
     rabbitmq_order_queue: str = "agent.order-created"
     rabbitmq_dead_letter_exchange: str = "dme.dlx"
+    grpc_host: str = "0.0.0.0"
+    grpc_port: int = 50051
 
     model_config = SettingsConfigDict(
         env_file=".env",

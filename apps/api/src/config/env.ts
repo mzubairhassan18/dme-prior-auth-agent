@@ -5,6 +5,8 @@ export const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   PORT: z.coerce.number().int().positive().default(3001),
   RABBITMQ_URL: z.string().min(1).default('amqp://dme:dme@localhost:5672'),
+  AGENT_GRPC_URL: z.string().min(1).default('localhost:50051'),
+  AGENT_PROTO_PATH: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
