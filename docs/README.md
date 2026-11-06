@@ -14,7 +14,7 @@ each step. File names are the real step names.
 | prior-auth-agent-workflow     | [plan](plan/prior-auth-agent-workflow.md) | ✅ [progress](progress/prior-auth-agent-workflow.md) |
 | event-driven-messaging        | [plan](plan/event-driven-messaging.md)    | ✅ [progress](progress/event-driven-messaging.md)    |
 | grpc-contracts                | [plan](plan/grpc-contracts.md)            | ✅ [progress](progress/grpc-contracts.md)            |
-| realtime-dashboard            | —                                         | —                                                    |
+| realtime-dashboard            | [plan](plan/realtime-dashboard.md)        | ✅ [progress](progress/realtime-dashboard.md)        |
 | caching-and-document-storage  | —                                         | —                                                    |
 | integration-testing-and-ci    | —                                         | —                                                    |
 | deployment-and-demo-readiness | —                                         | —                                                    |

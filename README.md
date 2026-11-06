@@ -48,8 +48,8 @@ Errors are RFC 7807 `application/problem+json`. Run the API with
 
 ![Dashboard](docs/assets/dashboard.png)
 
-- `/` — prior-authorization queue: status stats, orders with patient/insurance,
-  HCPCS/ICD-10 codes, clinical note preview, 5-second refresh
+- `/` — prior-authorization queue: status stats, live updates over Socket.IO (with a
+  10s polling fallback), decision badges, patient/insurance and HCPCS/ICD-10 context
 - `/intake` — DME order form validated by the **same Zod schema as the API**; server
   problem details map back onto form fields
 
@@ -98,8 +98,9 @@ stays local through Ollama.
 Creating an order publishes a confirmed `order.created` event to RabbitMQ
 (topic exchange `dme.events`). A dedicated worker consumes it with prefetch 1 and runs
 the same workflow, so intake responds immediately while analysis happens in the
-background. Failures are rejected to a dead-letter queue; the HTTP endpoint remains
-available for manual retries.
+background. The agent publishes `order.analyzing` / `order.analyzed` / `order.failed`;
+the API relays all `order.*` events to the dashboard over Socket.IO. Failures are
+rejected to a dead-letter queue; the HTTP endpoint remains available for manual retries.
 
 ```bash
 # separate terminal, from services/agent

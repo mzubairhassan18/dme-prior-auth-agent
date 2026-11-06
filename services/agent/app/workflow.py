@@ -12,6 +12,7 @@ from .prompts import (
     build_decision_prompt,
     citation_label,
 )
+from .publisher import EventPublisher
 from .rag import PolicyRetriever, RetrievalError, RetrievedChunk
 from .repository import (
     DecisionPayload,
@@ -70,9 +71,15 @@ def build_workflow(
     retriever: PolicyRetriever,
     repository: OrderRepository,
     model_name: str,
+    publisher: EventPublisher | None = None,
 ):
     async def mark_analyzing(state: WorkflowState) -> dict[str, Any]:
         await repository.mark_analyzing(state["order"].id)
+        if publisher is not None:
+            await publisher.publish(
+                "order.analyzing",
+                {"orderId": state["order"].id, "status": "ANALYZING"},
+            )
         return {}
 
     async def extract(state: WorkflowState) -> dict[str, Any]:
@@ -179,9 +186,15 @@ class AnalysisResult:
 
 
 class AnalysisService:
-    def __init__(self, graph, repository: OrderRepository) -> None:
+    def __init__(
+        self,
+        graph,
+        repository: OrderRepository,
+        publisher: EventPublisher | None = None,
+    ) -> None:
         self._graph = graph
         self._repository = repository
+        self._publisher = publisher
 
     async def analyze(self, order_id: str) -> AnalysisResult:
         order = await self._repository.fetch_order(order_id)
@@ -195,15 +208,38 @@ class AnalysisService:
             except RepositoryError:
                 logger.exception("could not mark order %s as FAILED", order_id)
 
+            if self._publisher is not None:
+                await self._publisher.publish(
+                    "order.failed",
+                    {
+                        "orderId": order_id,
+                        "status": "FAILED",
+                        "error": str(exc)[:500],
+                    },
+                )
+
             if isinstance(exc, (ProviderError, WorkflowError, RetrievalError)):
                 raise
             if isinstance(exc, RepositoryError):
                 raise
             raise WorkflowError(f"Agent workflow failed: {exc}") from exc
 
+        decision = final_state["decision"]
+        if self._publisher is not None:
+            await self._publisher.publish(
+                "order.analyzed",
+                {
+                    "orderId": order_id,
+                    "status": "DECISION_READY",
+                    "outcome": decision.outcome,
+                    "policyReference": decision.policy_reference,
+                    "confidence": decision.confidence,
+                },
+            )
+
         return AnalysisResult(
             extraction=final_state["extraction"],
-            decision=final_state["decision"],
+            decision=decision,
             citations=final_state["citations"],
             latency_ms=round((time.perf_counter() - started) * 1000),
         )

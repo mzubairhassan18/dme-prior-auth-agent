@@ -2,8 +2,10 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import type { AuthorizationDecision } from '@dme/shared';
 import { api, ApiError } from '@/lib/api';
 import { StatusBadge } from '@/components/status-badge';
+import { useOrderEvents } from '@/lib/use-order-events';
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', {
   month: 'short',
@@ -12,7 +14,21 @@ const dateFormatter = new Intl.DateTimeFormat('en-US', {
   minute: '2-digit',
 });
 
+const decisionStyles: Record<AuthorizationDecision['outcome'], string> = {
+  APPROVE: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  NEEDS_MORE_INFO: 'bg-amber-50 text-amber-700 ring-amber-200',
+  DENY: 'bg-rose-50 text-rose-700 ring-rose-200',
+};
+
+const eventLabels: Record<string, string> = {
+  'order.created': 'Intake received',
+  'order.analyzing': 'Agent started analysis',
+  'order.analyzed': 'Decision ready',
+  'order.failed': 'Analysis failed',
+};
+
 export default function DashboardPage() {
+  const { connected, lastEvent } = useOrderEvents();
   const {
     data: orders,
     isLoading,
@@ -20,7 +36,7 @@ export default function DashboardPage() {
   } = useQuery({
     queryKey: ['orders'],
     queryFn: api.orders,
-    refetchInterval: 5_000,
+    refetchInterval: connected ? false : 10_000,
   });
 
   const submitted = orders?.filter((order) => order.status === 'SUBMITTED').length ?? 0;
@@ -35,15 +51,49 @@ export default function DashboardPage() {
             Prior authorization queue
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            DME orders awaiting agent review — refreshes every 5 seconds.
+            DME orders awaiting agent review — updates stream in over Socket.IO.
           </p>
+          {lastEvent && (
+            <p className="mt-1 text-xs text-slate-500">
+              <span className="font-medium text-slate-700">
+                {eventLabels[lastEvent.type] ?? lastEvent.type}
+              </span>
+              {lastEvent.data.orderId && (
+                <>
+                  <span className="mx-1 text-slate-300">·</span>
+                  order {lastEvent.data.orderId.slice(0, 8)}…
+                </>
+              )}
+              <span className="mx-1 text-slate-300">·</span>
+              {new Date(lastEvent.occurredAt).toLocaleTimeString()}
+            </p>
+          )}
         </div>
-        <Link
-          href="/intake"
-          className="rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
-        >
-          New intake
-        </Link>
+        <div className="flex items-center gap-3">
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+              connected ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+            }`}
+            title={
+              connected
+                ? 'Socket.IO connected to the API'
+                : 'Socket disconnected — falling back to polling'
+            }
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                connected ? 'animate-pulse bg-emerald-500' : 'bg-amber-500'
+              }`}
+            />
+            {connected ? 'Live' : 'Polling fallback'}
+          </span>
+          <Link
+            href="/intake"
+            className="rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
+          >
+            New intake
+          </Link>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
@@ -127,6 +177,25 @@ export default function DashboardPage() {
                   qty {order.quantity}
                 </p>
                 <p className="mt-1 line-clamp-1 text-xs text-slate-400">{order.clinicalNotes}</p>
+                {order.decision && (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                    <span
+                      className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${
+                        decisionStyles[order.decision.outcome]
+                      }`}
+                    >
+                      {order.decision.outcome.replaceAll('_', ' ')}
+                    </span>
+                    <span className="max-w-[16rem] truncate text-xs text-slate-400">
+                      {order.decision.policyReference}
+                    </span>
+                    {order.decision.confidence != null && (
+                      <span className="text-xs text-slate-400">
+                        {Math.round(order.decision.confidence * 100)}% confidence
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="flex flex-col items-end gap-1.5">
                 <StatusBadge status={order.status} />

@@ -17,7 +17,7 @@ export class OrdersService {
         ...(query.patientId ? { patientId: query.patientId } : {}),
       },
       orderBy: { createdAt: 'desc' },
-      include: { patient: true },
+      include: { patient: true, decision: true },
     });
   }
 

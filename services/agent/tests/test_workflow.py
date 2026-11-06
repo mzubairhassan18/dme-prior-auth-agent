@@ -108,12 +108,31 @@ class FakeRepository:
         self.failures.append((order_id, reason))
 
 
-def make_service(provider=None, retriever=None, repository=None):
+class FakePublisher:
+    def __init__(self) -> None:
+        self.events: list[tuple[str, dict]] = []
+
+    async def publish(self, event_type: str, data: dict) -> None:
+        self.events.append((event_type, data))
+
+
+def make_service(provider=None, retriever=None, repository=None, publisher=None):
     provider = provider or FakeProvider()
     retriever = retriever or FakeRetriever()
     repository = repository or FakeRepository()
-    graph = build_workflow(provider, retriever, repository, model_name="phi4-mini")
-    return AnalysisService(graph, repository), provider, retriever, repository
+    graph = build_workflow(
+        provider,
+        retriever,
+        repository,
+        model_name="phi4-mini",
+        publisher=publisher,
+    )
+    return (
+        AnalysisService(graph, repository, publisher=publisher),
+        provider,
+        retriever,
+        repository,
+    )
 
 
 async def test_workflow_persists_cited_decision():
@@ -135,6 +154,24 @@ async def test_workflow_persists_cited_decision():
 
     assert provider.calls == ["ClinicalExtraction", "DecisionRecommendation"]
     assert "E0601" in retriever.queries[0]
+
+
+async def test_publishes_lifecycle_events():
+    publisher = FakePublisher()
+    service, _, _, _ = make_service(publisher=publisher)
+
+    await service.analyze(ORDER.id)
+
+    assert [event_type for event_type, _ in publisher.events] == [
+        "order.analyzing",
+        "order.analyzed",
+    ]
+    analyzing = publisher.events[0][1]
+    analyzed = publisher.events[1][1]
+    assert analyzing == {"orderId": ORDER.id, "status": "ANALYZING"}
+    assert analyzed["status"] == "DECISION_READY"
+    assert analyzed["outcome"] == "APPROVE"
+    assert analyzed["policyReference"] == "cpap › Coverage criteria"
 
 
 async def test_unknown_citation_falls_back_to_top_chunk():
@@ -160,7 +197,10 @@ async def test_bracketed_citation_is_canonicalized():
 
 
 async def test_provider_failure_marks_order_failed():
-    service, _, _, repository = make_service(provider=FailingProvider())
+    publisher = FakePublisher()
+    service, _, _, repository = make_service(
+        provider=FailingProvider(), publisher=publisher
+    )
 
     with pytest.raises(ProviderError):
         await service.analyze(ORDER.id)
@@ -168,6 +208,11 @@ async def test_provider_failure_marks_order_failed():
     assert repository.saved == []
     assert repository.failures[0][0] == ORDER.id
     assert "model unavailable" in repository.failures[0][1]
+    assert [event_type for event_type, _ in publisher.events] == [
+        "order.analyzing",
+        "order.failed",
+    ]
+    assert publisher.events[1][1]["status"] == "FAILED"
 
 
 async def test_unknown_order_raises_not_found():
